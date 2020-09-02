@@ -61,6 +61,7 @@ COLUMN_NAMES = {'Timestamp': 'TIMESTAP',
 PANOPTO_SERVER_NAME = 'huji.cloud.panopto.eu'
 PANOPTO_CLIEND_ID = None
 PANOPTO_SECRET = None
+GOOGLE_JSON = None
 BASE_URL = 'https://{0}/Panopto/api/v1/'.format(PANOPTO_SERVER_NAME)
 END_DATE_SEMESTER_A = datetime(year=2021, day=29, month=1, tzinfo=pytz.UTC)
 END_DATE_SEMESTER_B = datetime(year=2021, day=1, month=7, tzinfo=pytz.UTC)

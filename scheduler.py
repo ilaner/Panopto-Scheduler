@@ -27,12 +27,15 @@ def parse_argument():
                             help='Client Secret of OAuth2 client')
     arg_parser.add_argument('--user', dest='user', required=True, help='What is your mail user')
     arg_parser.add_argument('--password', dest='password', required=True, help='What is your mail password?')
+    arg_parser.add_argument('--google-json', dest='google_json', required=True, help='What is your mail password?')
+
     args = arg_parser.parse_args()
     config.PANOPTO_CLIEND_ID = args.client_id
     config.PANOPTO_SECRET = args.client_secret
     config.USER = args.user
     config.TO_SEND = [args.user]
     config.PASSWORD = args.password
+    config.GOOGLE_JSON = args.google_json
 
 
 parse_argument()
@@ -180,7 +183,7 @@ def search(course_id, year, semester):
 # use creds to create a client to interact with the Google Drive API
 scope = ['https://spreadsheets.google.com/feeds',
          'https://www.googleapis.com/auth/drive']
-creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_name(config.GOOGLE_JSON, scope)
 client = gspread.authorize(creds)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Use requests module's Session object in this example.
