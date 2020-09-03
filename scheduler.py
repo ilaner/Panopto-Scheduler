@@ -131,7 +131,7 @@ class Recording:
         self.success = True
         subject = 'התזמון בוצע בהצלחה!'
         body = f'The recording was scheduled Successfully. \n' \
-               f'The record will be available in https://huji.cloud.panopto.eu/Panopto/Pages/Sessions/List.aspx#folderID={self.folder_id} \n'
+               f'The record will be available in https://huji.cloud.panopto.eu/Panopto/Pages/Sessions/List.aspx#folderID={self.folder_id}\n'
         self.document_action(body, subject)
 
     def document_action(self, body, subject):
