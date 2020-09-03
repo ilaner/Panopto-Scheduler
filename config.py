@@ -6,6 +6,13 @@ from datetime import datetime
 USER = None
 PASSWORD = None
 TO_SEND = None
+LOG_FILE = 'scheduler.log'
+
+PANOPTO_SERVER_NAME = 'huji.cloud.panopto.eu'
+PANOPTO_CLIEND_ID = None
+PANOPTO_SECRET = None
+GOOGLE_JSON = None
+BASE_URL = 'https://{0}/Panopto/api/v1/'.format(PANOPTO_SERVER_NAME)
 
 ISRAEL = pytz.timezone('Israel')
 locale.setlocale(locale.LC_ALL, "he_IL")
@@ -58,11 +65,6 @@ COLUMN_NAMES = {'Timestamp': 'TIMESTAP',
                 'קישור לתיקייה': 'FOLDER_ID',
                 'האם ההקלטה חוזרת על עצמה כל שבוע?': 'IS_REPEAT'}
 
-PANOPTO_SERVER_NAME = 'huji.cloud.panopto.eu'
-PANOPTO_CLIEND_ID = None
-PANOPTO_SECRET = None
-GOOGLE_JSON = None
-BASE_URL = 'https://{0}/Panopto/api/v1/'.format(PANOPTO_SERVER_NAME)
 END_DATE_SEMESTER_A = datetime(year=2021, day=29, month=1, tzinfo=pytz.UTC)
 END_DATE_SEMESTER_B = datetime(year=2021, day=1, month=7, tzinfo=pytz.UTC)
 

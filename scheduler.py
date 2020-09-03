@@ -15,6 +15,7 @@ from email.mime.multipart import MIMEMultipart
 import schedule
 import argparse
 import config
+import socket
 
 
 def parse_argument():
@@ -25,8 +26,8 @@ def parse_argument():
     arg_parser.add_argument('--client-id', dest='client_id', required=True, help='Client ID of OAuth2 client')
     arg_parser.add_argument('--client-secret', dest='client_secret', required=True,
                             help='Client Secret of OAuth2 client')
-    arg_parser.add_argument('--user', dest='user', required=True, help='What is your mail user')
-    arg_parser.add_argument('--password', dest='password', required=True, help='What is your mail password?')
+    arg_parser.add_argument('--user', dest='user', required=False, help='What is your mail user')
+    arg_parser.add_argument('--password', dest='password', required=False, help='What is your mail password?')
     arg_parser.add_argument('--google-json', dest='google_json', required=True, help='What is your mail password?')
 
     args = arg_parser.parse_args()
@@ -36,9 +37,6 @@ def parse_argument():
     config.TO_SEND = [args.user]
     config.PASSWORD = args.password
     config.GOOGLE_JSON = args.google_json
-
-
-parse_argument()
 
 
 def authorization(requests_session, oauth2):
@@ -127,14 +125,21 @@ class Recording:
                 body = f"We have a problem with Scheduling {name}.\n" \
                        f"Probably times are wrong. Please call Multimedia.\n" \
                        f"Error message: {create_resp['Error']['Message']}\n"
-                self.send_mail_and_meeting(subject, body)
+                self.document_action(body, subject)
                 self.delete_all()
                 return
         self.success = True
         subject = 'התזמון בוצע בהצלחה!'
         body = f'The recording was scheduled Successfully. \n' \
                f'The record will be available in https://huji.cloud.panopto.eu/Panopto/Pages/Sessions/List.aspx#folderID={self.folder_id} \n'
-        self.send_mail_and_meeting(subject, body)
+        self.document_action(body, subject)
+
+    def document_action(self, body, subject):
+        if config.USER is not None and config.PASSWORD is not None:
+            self.send_mail_and_meeting(subject, body)
+        with open(config.LOG_FILE, 'w') as f:
+            f.write(f'{subject}\n{body}\n\n')
+            f.flush()
 
     def send_mail_and_meeting(self, subject, body):
         email_sender = config.USER
@@ -154,7 +159,7 @@ class Recording:
             server.sendmail(email_sender, config.TO_SEND, text)
             print('email sent')
             server.quit()
-        except:
+        except socket.error:
             print("SMPT server connection error")
         return True
 
@@ -179,33 +184,14 @@ def search(course_id, year, semester):
     return id
 
 
-
-# use creds to create a client to interact with the Google Drive API
-scope = ['https://spreadsheets.google.com/feeds',
-         'https://www.googleapis.com/auth/drive']
-creds = ServiceAccountCredentials.from_json_keyfile_name(config.GOOGLE_JSON, scope)
-client = gspread.authorize(creds)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# Use requests module's Session object in this example.
-# ref. https://2.python-requests.org/en/master/user/advanced/#session-objects
-requests_session = requests.Session()
-
-# Load OAuth2 logic
-oauth2 = PanoptoOAuth2(config.PANOPTO_SERVER_NAME, config.PANOPTO_CLIEND_ID, config.PANOPTO_SECRET, False)
-authorization(requests_session, oauth2)
-# Load Folders API logic
-folders = PanoptoFolders(config.PANOPTO_SERVER_NAME, False, oauth2)
-
-
 def update_client():
     global client
     client = gspread.authorize(creds)
 
-print(search('80131/80134', '2020-21', 'Semester 1'))
 
 # Find a workbook by name and open the first sheet
 # Make sure you use the right name here.
-def main():
+def schedule_all():
     sheet = client.open("RecordingsSchedule").sheet1
     data = pd.DataFrame(sheet.get_all_records())
     if data.empty:
@@ -233,29 +219,21 @@ def main():
         url = config.BASE_URL + "remoteRecorders/search?searchQuery={0}".format(quote(recorder))
         print('Calling GET {0}'.format(url))
         resp = requests_session.get(url=url).json()
-        if 'Results' not in resp:
+        recorder = [rr for rr in resp['Results'] if rr['Name'] == recorder]
+        if 'Results' not in resp or len(recorder) != 1:
             print("Recorder not found:\n{0}".format(resp))
             subject = 'לא ניתן לתזמן הקלטה'
             body = f"We have a problem with Scheduling.\n" \
                    f"We can't find the Recorder. Please call Multimedia.\n"
-            recording.send_mail_and_meeting(subject, body)
-            continue
-        recorder = [rr for rr in resp['Results'] if rr['Name'] == recorder]
-        if len(recorder) != 1:
-            subject = 'לא ניתן לתזמן הקלטה'
-            body = f"We have a problem with Scheduling. \n" \
-                   f"We can't find the Recorder. Please call Multimedia.\n"
-            recording.send_mail_and_meeting(subject, body)
+            recording.document_action(subject, body)
             continue
         recorder = recorder[0]
         start_date_str = f'{recording.date} {recording.start_time}'
         end_date_str = f'{recording.date} {recording.end_time}'
-        print(start_date_str)
         datetime_start = parser.parse(start_date_str, dayfirst=True)
         datetime_end = parser.parse(end_date_str, dayfirst=True)
         start_time = config.ISRAEL.localize(datetime_start)
         end_time = config.ISRAEL.localize(datetime_end)
-        print(recording.course_id)
         m = config.REGEX_FOLDER_ID.search(recording.folder_id)
         if m is None:
             recording.folder_id = search(recording.course_id, recording.year, recording.semester)
@@ -265,21 +243,38 @@ def main():
             subject = 'לא ניתן לתזמן הקלטה'
             body = f"We have a problem with Scheduling. \n" \
                    f"We can't find the course or the folder. Please call Multimedia"
-            recording.send_mail_and_meeting(subject, body)
+            recording.document_action(subject, body)
         recording.schedule(recorder, start_time, end_time)
         sheet.delete_rows(recording.row)
 
     sheet.delete_rows(2, len(recordings) + 1)
 
 
-# except:
-#     authorization(requests_session, oauth2)
-#     update_client()
+def main():
+    global folders, client, creds, requests_session
+    # use creds to create a client to interact with the Google Drive API
+    scope = ['https://spreadsheets.google.com/feeds',
+             'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name(config.GOOGLE_JSON, scope)
+    client = gspread.authorize(creds)
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    # Use requests module's Session object in this example.
+    # ref. https://2.python-requests.org/en/master/user/advanced/#session-objects
+    requests_session = requests.Session()
+
+    # Load OAuth2 logic
+    oauth2 = PanoptoOAuth2(config.PANOPTO_SERVER_NAME, config.PANOPTO_CLIEND_ID, config.PANOPTO_SECRET, False)
+    authorization(requests_session, oauth2)
+    # Load Folders API logic
+    folders = PanoptoFolders(config.PANOPTO_SERVER_NAME, False, oauth2)
+
+    parse_argument()
+    schedule.every().minute.do(schedule_all)
+    schedule.every(1).hours.do(update_client)
+    schedule.every(1).hours.do(authorization, requests_session, oauth2)
+    while True:
+        schedule.run_pending()
 
 
-schedule.every().minute.do(main)
-schedule.every(1).hours.do(update_client)
-schedule.every(1).hours.do(authorization, requests_session, oauth2)
-
-while True:
-    schedule.run_pending()
+if __name__ == '__main__':
+    main()
